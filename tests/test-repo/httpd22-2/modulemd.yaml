@@ -1,0 +1,31 @@
+document: modulemd
+version: 0
+data:
+        name: httpd
+        version: 2.2.15
+        release: 2
+        summary: Apache httpd webserver
+        description: >
+                Apache httpd webserver module for testing purposes.
+        license:
+                module:
+                        - ASL 2.0
+                content: []
+        xmd: ~
+        dependencies:
+                requires:
+                        apr: 0.1
+        references:
+                community: http://www.example.com/
+                documentation: http://www.example.com/
+                tracker: http://www.example.com/
+        components:
+                rpms:
+                        dependencies: True
+                        fulltree: True
+                        packages:
+                                httpd:
+                                        repository: https://pagure.io/bar.git
+                                        cache: https://example.com/cache
+                                        commit: 26ca0c0
+                                        rationale: We need it.

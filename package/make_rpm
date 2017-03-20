@@ -1,0 +1,9 @@
+#! /bin/bash
+
+TARGET_DIR=$HOME/rpmbuild/SPECS
+mkdir -p $TARGET_DIR
+
+FM_VERSION=$(./package/archive)
+sed "s|@FM_GIT_REV@|${FM_VERSION}|" ./package/fm.spec > $TARGET_DIR/fm.spec
+
+rpmbuild -ba $TARGET_DIR/fm.spec

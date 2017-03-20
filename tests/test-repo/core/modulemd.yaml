@@ -1,0 +1,35 @@
+document: modulemd
+version: 0
+data:
+        name: core
+        version: 1.0
+        release: 1
+        summary: Core module
+        description: >
+                Core module.
+        license:
+                module:
+                        - ASL 2.0
+                content: []
+        xmd: ~
+        references:
+                community: http://www.example.com/
+                documentation: http://www.example.com/
+                tracker: http://www.example.com/
+        profiles:
+                default:
+                        rpms:
+                                - bar
+                minimal:
+                        rpms:
+                                - foo
+        components:
+                rpms:
+                        dependencies: True
+                        fulltree: True
+                        packages:
+                                bar:
+                                        repository: https://pagure.io/bar.git
+                                        cache: https://example.com/cache
+                                        commit: 26ca0c0
+                                        rationale: We need it.

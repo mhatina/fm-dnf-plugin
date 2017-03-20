@@ -1,0 +1,42 @@
+[
+    {
+        "name": "core",
+        "summary": "Core module",
+        "version": "1.0",
+        "release": "1",
+        "url": "core",
+        "requires": {}
+    },
+    {
+        "name": "apr",
+        "summary": "APR libraries module",
+        "version": "0.1",
+        "release": "1",
+        "url": "apr",
+        "requires": {"core": "1.0"}
+    },
+    {
+        "name": "httpd",
+        "summary": "Apache httpd webserver module",
+        "version": "2.4.18",
+        "release": "1",
+        "url": "httpd24",
+        "requires": {"apr": "0.1"}
+    },
+    {
+        "name": "httpd",
+        "summary": "Apache httpd webserver module",
+        "version": "2.2.15",
+        "release": "1",
+        "url": "httpd22",
+        "requires": {"apr": "0.1"}
+    },
+    {
+        "name": "httpd",
+        "summary": "Apache httpd webserver module",
+        "version": "2.2.15",
+        "release": "2",
+        "url": "httpd22-2",
+        "requires": {"apr": "0.1"}
+    }
+]

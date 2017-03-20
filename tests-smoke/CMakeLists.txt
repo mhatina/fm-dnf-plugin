@@ -1,0 +1,1 @@
+ADD_CUSTOM_TARGET(smoke ${CMAKE_CURRENT_SOURCE_DIR}/runtests.sh)
