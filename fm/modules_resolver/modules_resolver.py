@@ -16,9 +16,11 @@
 #
 # Written by Jan Kaluza
 
-from modulemd_resolver import ModulesResolver
+
 import fm.exceptions
 from fm.metadata_cache import CachedModuleMetadata
+from fm.modules_resolver import ModulesResolver
+
 
 class FmModulesResolver(ModulesResolver):
     """
@@ -26,10 +28,7 @@ class FmModulesResolver(ModulesResolver):
     and does the enablement/disablement/upgrade/downgrade of modules.
     """
 
-    def __init__(self, mods, operator = "=="):
-        """
-        Creates new FmModulesResolver instance.
-        """
+    def __init__(self, mods, operator="=="):
         ModulesResolver.__init__(self)
         self.set_default_requires_operator(operator)
 
@@ -38,12 +37,11 @@ class FmModulesResolver(ModulesResolver):
 
         # Populate the ModulesResolver with the current state of modules
         # metadata on the system.
-        for name, mods in mods.items():
-            for mod in mods:
-                if mod.is_enabled() and self.mods.enabled_cache.is_cached(mod):
-                    self.add_enabled_mmd(mod.mmd)
-                else:
-                    self.add_available_mmd(mod.mmd)
+        for name, mod in mods.items():
+            if mod.is_enabled():
+                self.add_enabled_mmd(mod)
+            else:
+                self.add_available_mmd(mod)
 
         self._original_arg = None
         self.action = None
