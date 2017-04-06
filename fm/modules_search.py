@@ -18,17 +18,11 @@
 
 
 from __future__ import print_function
-import os
-import requests
-from collections import OrderedDict
 
-import modulemd
-import fm.exceptions
-from fm.module import Module
-from fm.metadata_cache import MetadataCache
-from fm.fm_modules_resolver import FmModulesResolver
 import fnmatch
 import re
+
+import fm.exceptions
 import fm.modules
 
 
@@ -54,8 +48,7 @@ class ModulesSearch(object):
         :param dictionary keywords: Dictionary of keywords to search for.
         """
 
-        matching = fm.modules.Modules(self.mods.cfg, self.mods.opts,
-                                      self.mods.api_clients)
+        matching = fm.modules.Modules(self.mods.cfg, self.mods.opts)
 
         if len(keywords) == 0:
             return matching

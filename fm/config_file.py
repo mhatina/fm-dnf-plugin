@@ -16,39 +16,50 @@
 #
 # Written by Jan Kaluza
 
+default_config_path = "/etc/dnf/plugins/module.conf"
+
 try:
     from configparser import ConfigParser
 except:
     from ConfigParser import ConfigParser
 
-import io
 
-import fm.exceptions
+class ModuleSection:
+    def __init__(self, name, enabled, version, profiles):
+        self._erase = False
+
+        self._name = name
+        self._enabled = enabled
+        self._version = version
+        self._installed_profiles = profiles
+
+    @property
+    def erase(self):
+        return self._erase
+
+    @erase.setter
+    def erase(self, value):
+        if not isinstance(value, bool):
+            raise ValueError("ModuleSection.erase value has to be bool")
+        self._erase = value
+
 
 class ConfigFile(ConfigParser):
-    def __init__(self):
+    def __init__(self, config_file=default_config_path):
         ConfigParser.__init__(self)
+        self._config_file = config_file
 
-    def set_defaults(self):
-        if not self.has_section("fm"):
-            self.add_section("fm")
+    def load(self):
+        self.read([self._config_file])
 
-        if not self.has_option("fm", "modules_dir"):
-            self.set("fm", "modules_dir", "/etc/fm.modules.d")
+    def update_module(self, module_section):
+        if module_section.erase:
+            self.remove_section(module_section._name)
+            return
 
-        if not self.has_option("fm", "cache_dir"):
-            self.set("fm", "cache_dir", "/var/cache/fm")
+        self.set(module_section._name, "enabled", module_section._enabled)
+        self.set(module_section._name, "version", module_section._version)
+        self.set(module_section._name, "profiles", module_section._installed_profiles)
 
-    def load(self, config_file):
-        self.read([config_file])
-        self.set_defaults()
-
-    def loads(self, config):
-        self.readfp(io.StringIO(config))
-        self.set_defaults()
-
-    def get_modules_dir(self):
-        return self.get("fm", "modules_dir")
-
-    def get_cache_dir(self):
-        return self.get("fm", "cache_dir")
+        with open(self._config_file, 'w') as configfile:
+            self.write(configfile)

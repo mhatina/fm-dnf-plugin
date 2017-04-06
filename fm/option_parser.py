@@ -1,4 +1,3 @@
-# optparse.py
 # CLI options parser.
 #
 # Copyright (C) 2016  Red Hat, Inc.
@@ -19,8 +18,7 @@
 #
 
 import argparse
-import sys
-import re
+
 
 class OptionParser(argparse.ArgumentParser):
     """
@@ -35,7 +33,7 @@ class OptionParser(argparse.ArgumentParser):
         self.add_argument("-v", "--verbose", action="store_true",
                            default=None, help="Show verbose output.")
         self.add_argument("-c", "--config", action="store",
-                           default="/etc/fm/fm.cfg",
+                           default="/etc/dnf/plugins/module.conf",
                            help="Configuration file.")
         self.add_argument("-r", "--root", action="store",
                            default="/",

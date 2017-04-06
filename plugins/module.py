@@ -46,27 +46,20 @@ API documentation
 """
 
 from __future__ import print_function
-from dnf.pycomp import PY3
-from subprocess import call
-from dnfpluginscore import _, logger
-from dnf.i18n import ucd
-import dnfpluginscore
-
-import dnf
-import dnf.cli
-import glob
-import json
-import os
-import platform
-import shutil
-import stat
-from fm.cli import Cli
-from fm.modules import Modules
-import fm.exceptions
-import fm.api_clients
 
 import sys
 import traceback
+
+import dnf
+import dnf.cli
+from dnf.i18n import ucd
+from dnf.pycomp import PY3
+from dnfpluginscore import _, logger
+
+import fm.dnf_base
+import fm.exceptions
+from fm.cli import Cli
+from fm.modules import Modules
 
 YES = set([_('yes'), _('y')])
 NO = set([_('no'), _('n'), ''])
@@ -77,9 +70,10 @@ try:
 except NameError:
     pass
 if PY3:
-    from configparser import ConfigParser
+    pass
 else:
-    from ConfigParser import ConfigParser
+    pass
+
 
 class Module(dnf.Plugin):
     """DNF plugin supplying the 'module' subcommand."""
@@ -93,34 +87,6 @@ class Module(dnf.Plugin):
             cli.register_command(ModuleCommand)
         self.base = base
         self.cli = cli
-
-    def sack(self):
-        if not self.cli.demands.resolving or self.cli.base.basecmd in ("remove", "reinstall"):
-            return
-
-        # exclude packages installed from modules
-        # these packages will be marked for installation
-        # which could prevent them from upgrade and downgrade
-        # to prevent "conflicting job" error it's not applied
-        # to "remove" and "reinstall" commands
-        module_repos = []
-        cli = Cli()
-        cli.parse_args([])
-        mods = Modules(cli.config_file, cli.opts, cli.api)
-        mods.load_enabled_modules()
-        for _mods in mods.values():
-            for mod in _mods:
-                repo_name = mod.repo_file.get_repo_name()
-                if not repo_name in module_repos:
-                    module_repos.append("@" + repo_name)
-        module_pkgs = self.base.sack.query().installed()
-        installed_module_pkgs = \
-            (p for p in module_pkgs if p.from_repo in module_repos)
-        for pkg in installed_module_pkgs:
-            try:  # dnf-1.1.9 to prevent warning message
-                self.base._goal.install(pkg)
-            except AttributeError:
-                self.base.goal.install(pkg)
 
 
 class ModuleCommand(dnf.cli.Command):
@@ -145,11 +111,9 @@ class ModuleCommand(dnf.cli.Command):
     @staticmethod
     def set_argparser(parser):
         parser.add_argument('subcommand', nargs=1,
-                            choices=['help', 'list', 'list-enabled',
+                            choices=['help', 'list', 'list-installed',
                                      'info', 'summary', 'search',
-                                     "enable", "disable", "refresh",
-                                     "upgrade", "check-upgrade",
-                                     "rebase", "check-rebase"])
+                                     'refresh', 'install'])
         parser.add_argument('arg', nargs='*')
 
         parser.add_argument('--name', dest='_search_name',
@@ -175,47 +139,9 @@ class ModuleCommand(dnf.cli.Command):
         demands = self.cli.demands
         demands.resolving = False
 
-    def run_transaction(self):
-        """Perform the depsolve, download and RPM transaction stage."""
-        # Solve problem with incorrect module repo file committing
-        if self.base.sack:
-            if self.base.transaction is None:
-                self.base.resolve(self.cli.demands.allow_erasing)
-                logger.info(_('Dependencies resolved.'))
-
-            self.base._plugins.run_resolved()
-
-            # Run the transaction
-            displays = []
-            if self.cli.demands.transaction_display is not None:
-                displays.append(self.cli.demands.transaction_display)
-            try:
-                self.base.do_transaction(display=displays)
-            except dnf.cli.CliError as exc:
-                logger.error(ucd(exc))
-                fm.api_clients.DNFBASE.repofiles_action('roll_back')
-                return 1
-            except dnf.exceptions.TransactionCheckError as err:
-                fm.api_clients.DNFBASE.repofiles_action('roll_back')
-                for msg in self.cli.command.get_error_output(err):
-                    logger.critical(msg)
-            except IOError as e:
-                fm.api_clients.DNFBASE.repofiles_action('roll_back')
-                raise e
-            else:
-                self.base._plugins.run_transaction()
-                logger.info(_('Complete!'))
-            fm.api_clients.DNFBASE.repofiles_action('disabling')
-        return 0
-
     def run(self):
-        """
-        Executes subcommand passed to 'dnf' command.
-
-        :param list extcmds: list List of subcommands.
-        """
-        fm.api_clients.DNFBASE.dnfbase = self.base
-        fm.api_clients.DNFBASE.pluginbase = True
+        fm.dnfbase.base = self.base
+        fm.dnfbase.pluginbase = True
 
         try:
             Cli().run(self.opts)

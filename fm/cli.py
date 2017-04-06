@@ -22,23 +22,17 @@
 Command line interface fm class and related functions.
 """
 
-from __future__ import print_function
 from __future__ import absolute_import
-
-import os
-import sys
-import time
-import fnmatch
-import stat
-
-import fm.exceptions
-from fm.api_clients import APIClients
-from fm.option_parser import OptionParser
-from fm.module import Module
-from fm.modules import Modules
-from fm.config_file import ConfigFile
+from __future__ import print_function
 
 import json
+import sys
+
+import fm.exceptions
+from fm.config_file import ConfigFile
+from fm.modules import Modules
+from fm.option_parser import OptionParser
+
 
 class Cli(object):
     """ Class representing command line interface for controlling modules """
@@ -52,8 +46,6 @@ class Cli(object):
 
         #: File to which the output is written.
         self.output = output
-        #: APIClient instance to query the remote API server.
-        self.api = None
         #: OptionParser instance to handle command line arguments.
         self.optparser = OptionParser()
         #: Options set by command line.
@@ -61,21 +53,14 @@ class Cli(object):
         self.config_file = ConfigFile()
 
     def write(self, *args):
-        """
-        Writes arguments to the output file. Arguments are white-space
-        separated in the output.
-
-        :param list args: List of objects to write to output.
-        """
         if len(args[0]) == 0:
             return
 
-        print(" ".join(map(str, args)), file=self.output)
+        print("".join(map(str, args)), file=self.output)
 
     def parse_args(self, args):
         self.opts, args = self.optparser.parse_known_args(args)
         self.config_file.load(self.opts.config)
-        self.api = APIClients(self.config_file, self.opts)
         return args
 
     def run(self, opts):
@@ -83,10 +68,10 @@ class Cli(object):
         args = self.parse_args(opts.arg)
 
         if opts.subcommand is not None:
-            subcommand = self.opts.subcommand[0]
+            subcommand = opts.subcommand[0]
 
         try:
-            arg = args[1]
+            arg = args[0]
         except (ValueError, IndexError):
             arg = None
 
@@ -96,36 +81,21 @@ class Cli(object):
                 return 0
             elif subcommand == "list":
                 return self.list_modules()
-            elif subcommand == "list-enabled":
-                return self.list_enabled_modules()
+            elif subcommand == "list-installed":
+                return self.list_installed_modules()
             elif subcommand == "info":
                 return self.info_modules(arg)
+            elif subcommand == "install":
+                return self.install_module(arg)
             elif subcommand == "summary":
                 return self.summary_modules()
             elif subcommand == "search":
                 return self.search_modules(self.opts)
-            elif subcommand == "enable":
-                return self.enable_module(arg, args)
-            elif subcommand == "disable":
-                return self.disable_module(arg)
             elif subcommand == "refresh":
                 return self.refresh_cache()
-            elif subcommand == "upgrade":
-                return self.upgrade_modules(args)
-            elif subcommand == "check-upgrade":
-                return self.check_upgrade_modules(args)
-            elif subcommand == "rebase":
-                return self.rebase_module(arg, args)
-            elif subcommand == "check-rebase":
-                return self.check_rebase_modules(args)
             else:
                 raise fm.exceptions.Error('Unknown subcommand {}.'.format(subcommand))
         except fm.exceptions.APICallError:
-            if self.opts.verbose:
-                self.write("Raw data received from the API server:\n",
-                           '"""\n',
-                           "{}\n".format(self.api.get_raw_data()),
-                           '"""\n')
             raise
 
     def print_help(self):
@@ -138,63 +108,22 @@ class Cli(object):
         self.write("{}: Fedora modularization command line interface. ".format(fn))
         self.write("")
         self.write("Commands:")
-        self.write("    {} check-upgrade - Check for the availability of upgrade for enabled modules".format(fn))
-        self.write("    {} enable <module-nvr> [profile, ...] - Enable the module and its dependencies.".format(fn))
-        self.write("    {} disable <module> - Disable the module, depending modules and remove all module packages.".format(fn))
         self.write("    {} help - Show this help message.".format(fn))
         self.write("    {} info <module> - Show detail module information.".format(fn))
         self.write("    {} list - List all available modules.".format(fn))
-        self.write("    {} list-enabled - List enabled modules.".format(fn))
-        self.write("    {} rebase <module-nvr> - Rebase the module to particular version".format(fn))
+        self.write("    {} list-installed - List installed modules.".format(fn))
         self.write("    {} refresh - Refresh the local modules cache".format(fn))
         self.write("    {} search <args> Search for a module using at least one of the following args:".format(fn))
-        self.write("        {} --name <name> - Optional: Search for module by name".format(fn))
-        self.write("        {} --version <inequality> <version> - Optional: Search for module by version".format(fn))
-        self.write("        {} --release <inequality> <release> - Optional: Search for module by release".format(fn))
-        self.write("        {} --requires <name> <version> - Optional: Search for module by requires.".format(fn))
-        self.write("        {} --license <license name> - Optional: Search for module by module license.".format(fn))
-        self.write("        {} --json <json text> - Optional: Search using json. (See `--json help` for more details.)".format(fn))
+        self.write("        {} search --name <name> - Optional: Search for module by name".format(fn))
+        self.write("        {} search --version <inequality> <version> - Optional: Search for module by version".format(fn))
+        self.write("        {} search --release <inequality> <release> - Optional: Search for module by release".format(fn))
+        self.write("        {} search --requires <name> <version> - Optional: Search for module by requires.".format(fn))
+        self.write("        {} search --license <license name> - Optional: Search for module by module license.".format(fn))
+        self.write("        {} search --json <json text> - Optional: Search using json. (See `--json help` for more details.)".format(fn))
         self.write("    {} summary - Show modules statistics.".format(fn))
-        self.write("    {} upgrade <module> - Upgrade the module to latest release".format(fn))
         self.write("")
         self.write("Options:")
         self.write(self.optparser.get_usage())
-
-    def upload_module(self, local_path):
-        self.api.upload(local_path)
-        return 0
-
-    def enable_module(self, arg, args):
-        if arg is None:
-            self.write("No argument")
-            return 1
-
-        profiles = args[2:]
-        if len(profiles) == 0:
-            profiles = ["default"]
-
-        mods = self.api.list_modules()
-        mods.enable(arg, profiles)
-        return 0
-
-    def disable_module(self, arg):
-        """
-        Handles "disable" command. Disables the module.
-
-        :param string arg: Name of the module.
-        :return: Error code, 0 on success.
-        :rtype: int
-        """
-        if arg is None:
-            self.write("No argument")
-            return 1
-
-        # We don't need to fetch the module here, .disable() needs
-        # just module name...
-        mods = Modules(self.config_file, self.opts, self.api)
-        mods.load_enabled_modules()
-        mods.disable(arg)
-        return 0
 
     def info_modules(self, module):
         """
@@ -208,9 +137,65 @@ class Cli(object):
             self.write("No argument")
             return 1
 
-        mods = self.api.list_modules()
+        mods = self.get_modules()
         self.write(mods.get_full_description(module))
         return 0
+
+    def install_module(self, module):
+        if module is None:
+            self.write("No argument")
+            return 1
+
+        modules = Modules(self.config_file, self.opts)
+        modules.load_modules()
+        module_metadata = modules.get_modules(module)
+
+        if module_metadata is None:
+            self.write("No such module: {}".format(module))
+            return 1
+        module_metadata = module_metadata[0]
+
+        input_profile = self.get_profiles_from_user()
+
+        profiles = ["default"]
+        if len(input_profile) is not 0:
+            profiles = input_profile.split(",")
+
+        self.install_profiles(module_metadata, profiles)
+
+    @staticmethod
+    def get_profiles_from_user():
+        try:
+            input_profile = raw_input("What profile do you want to install? (default) ")
+        except NameError:
+            input_profile = input("What profile do you want to install? (default) ")
+        return input_profile
+
+    def install_profiles(self, module_metadata, profiles):
+        no_profile_found = True
+
+        for profile_name in profiles:
+            if profile_name not in module_metadata.profiles.keys():
+                self.write("No such profile: {}".format(profile_name))
+                continue
+
+            no_profile_found = False
+
+            profile = module_metadata.profiles[profile_name]
+            self.install_packages(module_metadata, profile)
+
+        if no_profile_found:
+            self.write("Possible profiles: {}".format(list(module_metadata.profiles)))
+
+    @staticmethod
+    def install_packages(module_metadata, profile):
+        base = fm.dnfbase.base
+        for repo in base.repos.iter_enabled():
+            repo.disable()
+        module_metadata.repo.enable()
+        base.fill_sack()
+        for rpm in profile.rpms:
+            base.install(rpm)
 
     def summary_modules(self):
         """
@@ -219,12 +204,14 @@ class Cli(object):
         :return: Error code, 0 on success.
         :rtype: int
         """
-        mods = self.api.list_modules()
-        mods_count = 0
-        for _mods in mods.values():
-            mods_count += len(_mods)
-        self.write("Modules: %u" % mods_count)
+        mods = self.get_modules()
+        self.write("Modules: {}".format(len(mods.values())))
         return 0
+
+    def get_modules(self):
+        mods = Modules(self.config_file, self.opts)
+        mods.load_modules()
+        return mods
 
     def list_modules(self):
         """
@@ -235,15 +222,18 @@ class Cli(object):
         :return: Error code, 0 on success.
         :rtype: int
         """
-        mods = self.api.list_modules()
-        self.write(mods.get_brief_description())
+        mods = self.get_modules()
+        self.write(mods.get_brief_description(False))
         return 0
 
-    def refresh_cache(self):
-        mods = self.api.list_modules(True)
-        mods.refresh_cache()
+    @staticmethod
+    def refresh_cache():
+        base = fm.dnfbase.base
+        for module in base.repos.iter_module():
+            module.enable()
+        base.update_cache()
 
-    def list_enabled_modules(self):
+    def list_installed_modules(self):
         """
         Handles "list-enabled" command. Prints the list of enabled modules.
 
@@ -252,9 +242,9 @@ class Cli(object):
         :return: Error code, 0 on success.
         :rtype: int
         """
-        mods = Modules(self.config_file, self.opts, self.api)
-        mods.load_enabled_modules(enabled_by_user=not self.opts.show_requirements)
-        self.write(mods.get_brief_description())
+        mods = Modules(self.config_file, self.opts)
+        mods.load_modules()
+        self.write(mods.get_brief_description(True))
         return 0
 
     def search_modules(self, args):
@@ -270,11 +260,11 @@ class Cli(object):
             self.write("No arguments")
             return 1
 
-        mods = Modules(self.config_file, self.opts, self.api)
-        mods.load_available_modules()
+        mods = Modules(self.config_file, self.opts)
+        mods.load_modules()
 
         if len(mods) == 0:
-            mods = self.api.list_modules()
+            mods = self.get_modules()
 
         arg_dict = dict()
 
@@ -344,45 +334,4 @@ class Cli(object):
         matching_mods = mods.search(arg_dict)
         self.write(matching_mods.get_brief_description())
 
-        return 0
-
-    def upgrade_modules(self, args):
-        """
-        Upgrades modules to latest available releases, but keeps the same
-        modules' versions. For example "httpd-2.2.15-1" to "httpd-2.2.15-2".
-
-        :param list mods: List of module names to update. If empty list is
-            supplied, all modules are updated.
-        :return: Error code, 0 on success
-        :rtype: int
-        """
-        mods = self.api.list_modules()
-        mods.upgrade(args[1:])
-        return 0
-
-    def check_upgrade_modules(self, args):
-        """
-        Prints list of modules for which the upgrade is available.
-        """
-        mods = self.api.list_modules()
-        to_upgrade = mods.check_upgrade(args[1:])
-        self.write(to_upgrade.get_brief_description())
-        return 0
-
-    def check_rebase_modules(self, args):
-        """
-        Prints list of modules for which the rebase is available.
-        """
-        mods = self.api.list_modules()
-        to_upgrade = mods.check_rebase(args[1:])
-        self.write(to_upgrade.get_brief_description())
-        return 0
-
-    def rebase_module(self, arg, args):
-        profiles = args[2:]
-        if len(profiles) == 0:
-            profiles = ["default"]
-
-        mods = self.api.list_modules()
-        mods.rebase(arg, profiles)
         return 0

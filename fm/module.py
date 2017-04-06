@@ -27,7 +27,7 @@ import fm.exceptions
 import dnf
 
 from fm.repo_file import RepoFile
-import fm.api_clients
+import fm.dnf_base
 
 from subprocess import *
 
@@ -89,10 +89,10 @@ class Module(object):
 
             rpms += profile.rpms
 
-            fm.api_clients.DNFBASE.dnf_install(rpms, self.name,
-                                               self.repo_file,
-                                               strict=True,
-                                               allow_erasing = True)
+            fm.dnf_base.DNFBASE.dnf_install(rpms, self.name,
+                                            self.repo_file,
+                                            strict=True,
+                                            allow_erasing = True)
 
     def fetch_module_metadata(self):
         """
@@ -129,7 +129,7 @@ class Module(object):
         Upgrades the packages provided by module to new release.
         """
         if call_dnf:
-            fm.api_clients.DNFBASE.dnf_upgrade(self.name)
+            fm.dnf_base.DNFBASE.dnf_upgrade(self.name)
 
     def disable(self, call_dnf = True):
         """
@@ -142,7 +142,7 @@ class Module(object):
         """
         if call_dnf:
             try:
-                fm.api_clients.DNFBASE.dnf_remove(self.name, self.repo_file)
+                fm.dnf_base.DNFBASE.dnf_remove(self.name, self.repo_file)
             except dnf.exceptions.Error as err:
                 if str(err) != "No packages marked for removal.":
                     raise
