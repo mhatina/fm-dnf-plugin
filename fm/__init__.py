@@ -19,3 +19,7 @@
 #
 
 from __future__ import absolute_import
+
+from fm.dnf_base import DnfBase
+
+dnfbase = DnfBase()
