@@ -29,7 +29,7 @@ import json
 import sys
 
 import fm.exceptions
-from fm.config_file import ConfigFile
+from fm.config_file import ConfigFile, ModuleSection
 from fm.modules import Modules
 from fm.option_parser import OptionParser
 
@@ -60,7 +60,7 @@ class Cli(object):
 
     def parse_args(self, args):
         self.opts, args = self.optparser.parse_known_args(args)
-        self.config_file.load(self.opts.config)
+        self.config_file.load()
         return args
 
     def run(self, opts):
@@ -155,13 +155,27 @@ class Cli(object):
             return 1
         module_metadata = module_metadata[0]
 
-        input_profile = self.get_profiles_from_user()
+        self.enable_only_installed_module(module_metadata.repo)
+        profiles = self.get_profiles_to_install()
+        installed = self.install_profiles(module_metadata, profiles)
+        section = ModuleSection(module_metadata.name,
+                                "true",
+                                str(module_metadata.version),
+                                installed)
+        self.config_file.update_module(section)
 
+    @staticmethod
+    def enable_only_installed_module(module_metadata):
+        for repo in fm.dnfbase.base.repos.iter_enabled():
+            repo.disable()
+        module_metadata.enable()
+
+    def get_profiles_to_install(self):
         profiles = ["default"]
+        input_profile = self.get_profiles_from_user()
         if len(input_profile) is not 0:
             profiles = input_profile.split(",")
-
-        self.install_profiles(module_metadata, profiles)
+        return profiles
 
     @staticmethod
     def get_profiles_from_user():
@@ -174,6 +188,7 @@ class Cli(object):
     def install_profiles(self, module_metadata, profiles):
         no_profile_found = True
 
+        installed_profiles = []
         for profile_name in profiles:
             if profile_name not in module_metadata.profiles.keys():
                 self.write("No such profile: {}".format(profile_name))
@@ -182,10 +197,13 @@ class Cli(object):
             no_profile_found = False
 
             profile = module_metadata.profiles[profile_name]
-            self.install_packages(module_metadata, profile)
+            if self.install_packages(module_metadata, profile):
+                installed_profiles.append(profile_name)
 
         if no_profile_found:
             self.write("Possible profiles: {}".format(list(module_metadata.profiles)))
+        else:
+            return installed_profiles
 
     @staticmethod
     def install_packages(module_metadata, profile):
@@ -194,8 +212,13 @@ class Cli(object):
             repo.disable()
         module_metadata.repo.enable()
         base.fill_sack()
+
+        atleast_one_installed = False
         for rpm in profile.rpms:
-            base.install(rpm)
+            if base.install(rpm):
+                atleast_one_installed = True
+
+        return atleast_one_installed
 
     def summary_modules(self):
         """

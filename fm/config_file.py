@@ -25,13 +25,13 @@ except:
 
 
 class ModuleSection:
-    def __init__(self, name, enabled, version, profiles):
+    def __init__(self, name, enabled=None, version=None, profiles=None):
         self._erase = False
 
         self._name = name
         self._enabled = enabled
         self._version = version
-        self._installed_profiles = profiles
+        self._profiles = profiles
 
     @property
     def erase(self):
@@ -43,23 +43,89 @@ class ModuleSection:
             raise ValueError("ModuleSection.erase value has to be bool")
         self._erase = value
 
+    @property
+    def name(self):
+        return self._name
+
+    @name.setter
+    def name(self, value):
+        if not isinstance(value, str):
+            raise ValueError("ModuleSection.name value has to be string")
+        self._name = value
+
+    @property
+    def version(self):
+        return self._version
+
+    @version.setter
+    def version(self, value):
+        if not isinstance(value, str):
+            raise ValueError("ModuleSection.version value has to be string")
+        self._version = value
+
+    @property
+    def enabled(self):
+        return self._enabled
+
+    @enabled.setter
+    def enabled(self, value):
+        if not isinstance(value, str):
+            raise ValueError("ModuleSection.enabled value has to be string")
+
+        possible_values = ["yes", "no", "1", "0", "true", "false"]
+        if value.lower() not in possible_values:
+            raise ValueError("ModuleSection.enabled value has to be one of {}"
+                             .format(possible_values))
+        self._name = value
+
+    @property
+    def profiles(self):
+        return self._profiles
+
+    @profiles.setter
+    def profiles(self, value):
+        if not isinstance(value, list):
+            raise ValueError("ModuleSection.profiles value has to be list")
+
+        self._profiles = value
+
 
 class ConfigFile(ConfigParser):
-    def __init__(self, config_file=default_config_path):
+    def __init__(self):
         ConfigParser.__init__(self)
-        self._config_file = config_file
+        self._config_file = default_config_path
 
-    def load(self):
-        self.read([self._config_file])
+    def load(self, config_file=None):
+        self.read(config_file if config_file is not None else self._config_file)
 
-    def update_module(self, module_section):
+    def update_module(self, module_section, removed=False):
         if module_section.erase:
-            self.remove_section(module_section._name)
+            self.remove_section(module_section.name)
             return
 
-        self.set(module_section._name, "enabled", module_section._enabled)
-        self.set(module_section._name, "version", module_section._version)
-        self.set(module_section._name, "profiles", module_section._installed_profiles)
+        self.create_section_if_does_not_exist(module_section)
+        installed_profiles = self.get_updated_profiles_list(module_section, removed)
+
+        self.set(module_section.name, "enabled", module_section.enabled)
+        self.set(module_section.name, "version", module_section.version)
+        self.set(module_section.name, "profiles", ','.join(installed_profiles))
 
         with open(self._config_file, 'w') as configfile:
             self.write(configfile)
+
+    def create_section_if_does_not_exist(self, module_section):
+        if not self.has_section(module_section.name):
+            self.add_section(module_section.name)
+
+    def get_updated_profiles_list(self, module_section, removed):
+        installed_profiles = None
+        if self.has_option(module_section.name, "profiles"):
+            installed_profiles = self.get(module_section.name, "profiles").split(",")
+            if removed:
+                for profile in module_section.profiles:
+                    installed_profiles.remove(profile)
+            else:
+                module_section.profiles.extends(self.get(module_section.name, "profiles"))
+        elif not removed:
+            installed_profiles = module_section.profiles
+        return installed_profiles
