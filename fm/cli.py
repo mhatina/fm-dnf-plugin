@@ -179,10 +179,11 @@ class Cli(object):
 
     @staticmethod
     def get_profiles_from_user():
+        message = "What profiles do you want to install? (default) "
         try:
-            input_profile = raw_input("What profile do you want to install? (default) ")
+            input_profile = raw_input(message)
         except NameError:
-            input_profile = input("What profile do you want to install? (default) ")
+            input_profile = input(message)
         return input_profile
 
     def install_profiles(self, module_metadata, profiles):
