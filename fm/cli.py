@@ -266,9 +266,7 @@ class Cli(object):
         :return: Error code, 0 on success.
         :rtype: int
         """
-        mods = Modules(self.config_file, self.opts)
-        mods.load_modules()
-        self.write(mods.get_brief_description(True))
+        self.write(self.config_file.get_installed_profiles())
         return 0
 
     def search_modules(self, args):

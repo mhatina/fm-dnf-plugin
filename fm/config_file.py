@@ -98,6 +98,21 @@ class ConfigFile(ConfigParser):
     def load(self, config_file=None):
         self.read(config_file if config_file is not None else self._config_file)
 
+    def get_installed_profiles(self):
+        description = ""
+
+        space_between_columns = 4
+        max_name_width = max(len(section) for section in self.sections()) + space_between_columns
+
+        description += "module".ljust(max_name_width)
+        description += "profiles\n"
+
+        for section in self.sections():
+            description += section.ljust(max_name_width)
+            description += "{}\n".format(self.get(section, "profiles"))
+
+        return description[:-1]
+
     def update_module(self, module_section, removed=False):
         if module_section.erase:
             self.remove_section(module_section.name)
